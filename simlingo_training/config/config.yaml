@@ -1,4 +1,4 @@
 defaults:
-  - train_base
+  - train_base  # Python dataclass인 TrainConfig를 Hydra의 ConfigStore에 등록한 이름
   - model/language_model: llm
   - experiment: debug #simlingo_seed1
