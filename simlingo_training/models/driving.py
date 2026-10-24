@@ -116,7 +116,7 @@ class DrivingModel(pl.LightningModule):
             driving_input = example
         
         if driving_input is not None:
-            adaptor_dict = self.adaptors(example, inference=True)
+            adaptor_dict = self.adaptors(example, inference=True)   # 
             adaptor_dict = self.vision_model.image_encoder.replace_placeholder_tokens(
                     adaptor_dict = adaptor_dict,
                     pixel_values = driving_input.camera_images,

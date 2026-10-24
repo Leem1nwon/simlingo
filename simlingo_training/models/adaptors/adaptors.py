@@ -109,7 +109,7 @@ class DrivingAdaptor(nn.Module):
 
         if predict_route_as_wps:
             self.future_waypoints = 20
-            self.query_embeds_wps = nn.Parameter(0.02 * torch.randn((1, self.future_waypoints, hidden_size)))
+            self.query_embeds_wps = nn.Parameter(0.02 * torch.randn((1, self.future_waypoints, hidden_size)))   # path wp queries [1, 20, hidden_size ]
             self.route_head = nn.Sequential(
                 nn.Linear(hidden_size, mlp_dim*2), nn.SiLU(True),nn.Linear(mlp_dim*2, mlp_dim), nn.SiLU(True), nn.Linear(mlp_dim, 2, bias=False)
             )
@@ -126,7 +126,7 @@ class DrivingAdaptor(nn.Module):
         else:
             raise ValueError(f"speed_wps_mode must be '1d' or '2d', not {speed_wps_mode}")
         self.future_speed_waypoints = 10 #TODO: read from config
-        self.query_embeds_speed = nn.Parameter(0.02 * torch.randn((1, self.future_speed_waypoints, hidden_size)))
+        self.query_embeds_speed = nn.Parameter(0.02 * torch.randn((1, self.future_speed_waypoints, hidden_size)))   # speed wp queries [1, 10, hidden_size]
         self.speed_wps_head = nn.Sequential(
                 nn.Linear(hidden_size, mlp_dim), nn.SiLU(True), nn.Linear(mlp_dim, dim, bias=False)
             )
@@ -149,16 +149,16 @@ class DrivingAdaptor(nn.Module):
         b = driving_input.camera_images.shape[0]
         inputs = None
 
-        for input_type in self.order:
+        for input_type in self.order:   # self.order = ['route', 'speed_wps'] or ['speed_wps'] depending on config
             query_embed = self.queries[input_type]
             if inputs is None:
-                inputs = query_embed.expand(b, -1, -1)
+                inputs = query_embed.expand(b, -1, -1)  # batch 차원에 맞게 query_embed 확장; [1, N, hidden_size] -> [B, N, hidden_size]
             else:
                 inputs = torch.cat((inputs, query_embed.expand(b, -1, -1)), dim=1)
 
         inputs_mask = torch.ones_like(inputs[:, :, 0], dtype=torch.bool)
 
-        return {"inputs": inputs, "inputs_mask": inputs_mask}
+        return {"inputs": inputs, "inputs_mask": inputs_mask}   # LLM 입력의 path wp, speed wp query token과 mask를 반환
 
     def get_predictions(
         self, 
@@ -244,16 +244,16 @@ class LanguageAdaptor(nn.Module):
         b = driving_input.camera_images.size(0)
         
         if inference:
-            label = driving_input.prompt_inference
-        else:
-            label = driving_input.prompt
+            label = driving_input.prompt_inference      # global LLM prompt for inference  
+        else:   
+            label = driving_input.prompt                # global LLM prompt for training
             
         if label is not None:
             ids = label.phrase_ids.long()
             ids_valid = label.phrase_valid  # true => is fed into model
-            ids_mask = label.loss_masking # true => takes part in loss
+            ids_mask = label.loss_masking   # true => takes part in loss
 
-        inputs = self.embed_tokens(ids.clamp(min=0, max=self.embed_tokens.num_embeddings - 1))
+        inputs = self.embed_tokens(ids.clamp(min=0, max=self.embed_tokens.num_embeddings - 1))  # token ID를 LLM의 embedding vector로 변환
         return {"inputs": inputs, "inputs_mask": ids_valid, "_ids": ids, "_ids_mask": ids_mask}
 
     def compute_loss(
@@ -313,15 +313,15 @@ class AdaptorList(nn.Module):
             inputs_mask_list.append(adaptor_input_dict["inputs_mask"])
             input_dict.update({key + "_" + k: v for k, v in adaptor_input_dict.items()})
 
-        inputs = torch.cat(inputs_list, dim=1)
+        inputs = torch.cat(inputs_list, dim=1)  # prompt text embedding 과 driving query embedding을 sequence 차원에서 concat
         inputs_mask = torch.cat(inputs_mask_list, dim=1)
         split_sizes = torch.as_tensor([x.size(1) for x in inputs_list])
-        arange = torch.arange(inputs.size(0), device=inputs.device)[:, None]
+        arange = torch.arange(inputs.size(0), device=inputs.device)[:, None]    # [B, 1] batch indices for per-sample gather
 
         # Apply random permutation of modalities during training
         rand_perm = torch.arange(inputs.size(1), device=inputs.device).expand(inputs.size(0), -1)
         # Apply permutation to move invalid tokens to end of sequence
-        valid_perm = inputs_mask[arange, rand_perm].byte().argsort(dim=-1, descending=True, stable=True)
+        valid_perm = inputs_mask[arange, rand_perm].byte().argsort(dim=-1, descending=True, stable=True)    # [B, S]
         perm = rand_perm.gather(1, valid_perm)
 
         input_dict["inputs"] = inputs[arange, perm]

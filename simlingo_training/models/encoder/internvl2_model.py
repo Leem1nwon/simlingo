@@ -32,14 +32,14 @@ class LingoInternVLModel(nn.Module):
             self.tokenizer = self.processor
 
         IMG_CONTEXT_TOKEN = '<IMG_CONTEXT>'
-        img_context_token_id = self.tokenizer.convert_tokens_to_ids(IMG_CONTEXT_TOKEN)
-        self.img_context_token_id = img_context_token_id
+        img_context_token_id = self.tokenizer.convert_tokens_to_ids(IMG_CONTEXT_TOKEN)  # <IMG_CONTEXT> 라는 문자열이 tokenizer 사전에서 몇 번 토큰인지 찾아서 정수 ID로 바꾸는 부분
+        self.img_context_token_id = img_context_token_id    # img_context_token_id
         
-        output_attentions = output_attentions if output_attentions is not None else self.model.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.model.config.output_hidden_states
-        )
-        return_dict = return_dict if return_dict is not None else self.model.config.use_return_dict
+        # output_attentions = output_attentions if output_attentions is not None else self.model.config.output_attentions
+        # output_hidden_states = (
+        #     output_hidden_states if output_hidden_states is not None else self.model.config.output_hidden_states
+        # )
+        # return_dict = return_dict if return_dict is not None else self.model.config.use_return_dict
 
         if inputs_embeds is None:
             # 1. Extract the input embeddings
@@ -51,7 +51,7 @@ class LingoInternVLModel(nn.Module):
             input_ids = adaptor_dict['language__ids']
             
             # 2a replace placeholder
-            smallest_added_id = self.tokenizer.additional_special_tokens_ids[0]
+            smallest_added_id = self.tokenizer.additional_special_tokens_ids[0]     # SimLingo가 tokenizer에 추가한 special token의 ID 중 가장 작은 값 -> 이 번호 이상일 경우 SimLingo의 placeholder 토큰이라는 기준선으로 사용
             special_ids = torch.tensor(list(set(input_ids[(input_ids >= smallest_added_id)].tolist())), device=input_ids.device)
             # special_ids = torch.tensor(list(set(ids[(ids > 50294)].tolist())), device=ids.device)
             special_ids = special_ids.view(-1, 1, 1)
@@ -80,7 +80,7 @@ class LingoInternVLModel(nn.Module):
                 coords = [torch.tensor(placeholder_values[b_id][special_ids[key_id].item()], device=input_ids.device, dtype=wp_encoder_dtype) for key_id, b_id in zip(special_token_pos[:, 1], special_token_pos[:, 0])]
                 coords_length_org = [len(coord) for coord in coords]
                 coords = torch.cat(coords)
-                wp_embeds = wp_encoder(coords.unsqueeze(0)).squeeze(0)
+                wp_embeds = wp_encoder(coords.unsqueeze(0)).squeeze(0)  # [2, 896]
                 wp_embeds = torch.split(wp_embeds, coords_length_org)
 
                 first_occurrences_filtered = [first_occurrences[i] for i in special_token_pos[:, 0]]
@@ -99,7 +99,7 @@ class LingoInternVLModel(nn.Module):
                 _, N_embed, C_embed = inputs_embeds.shape
                 
                 for pixel_values_tmp in all_pixel_values:
-                    BS, T, NP, C, H, W = pixel_values_tmp.shape
+                    BS, T, NP, C, H, W = pixel_values_tmp.shape     # [batch_size, num_frames, num_patches, channels, height, width]
                     assert T == 1, "Only one frame is supported for now"
                     # for multi-frame support, we need to change the code here
                     
@@ -111,7 +111,7 @@ class LingoInternVLModel(nn.Module):
                         # otherwise has to be stacked from list of (num_patches, num_channels, height, width)
                         raise ValueError(f"pixel_values of shape {pixel_values_tmp.shape}, expect to be of 4 or 5 dimensions")
                     
-                    image_features = self.model.extract_feature(pixel_values_tmp)
+                    image_features = self.model.extract_feature(pixel_values_tmp)   # ViT
                     image_features = image_features.reshape(-1, C_embed)
                                         
                     all_image_features.append(image_features)
