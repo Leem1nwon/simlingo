@@ -130,9 +130,9 @@ class DrivingModel(pl.LightningModule):
 
         if self.predict_language:
             # per batch item because of padding
-            for b_idx, (input_embed, attention_mask) in enumerate(zip(input_embeds_all, attention_masks)):
-                input_embed = input_embed.unsqueeze(0)
-                attention_mask = attention_mask.unsqueeze(0)
+            for b_idx, (input_embed, attention_mask) in enumerate(zip(input_embeds_all, attention_masks)):  # b_idx: batch 내의 샘플 인덱스, input_embed: 그 샘플의 임베딩, attention_mask: 그 샘플의 마스크
+                input_embed = input_embed.unsqueeze(0)          # batch 차원 추가
+                attention_mask = attention_mask.unsqueeze(0)    # batch 차원 추가
                 if self.language_model.variant == 'OpenGVLab/InternVL2-4B':
                     eos = self.tokenizer.added_tokens_encoder['<|end|>']
                 elif self.language_model.variant == 'OpenGVLab/InternVL2-2B':
@@ -142,24 +142,24 @@ class DrivingModel(pl.LightningModule):
 
                 # BUG: input_embeds, cot
                 sampled_tokens, input_embeds = self.language_model.greedy_sample(
-                    input_embed,
-                    eos_token_id=eos,
-                    max_new_tokens=100,
-                    input_embed_matrix=self.adaptors.language.embed_tokens.weight,
-                    logit_matrix=self.adaptors.language.lm_head.weight,
+                    input_embed,                                                        # 입력 임베딩
+                    eos_token_id=eos,                                                   # 종료 토큰
+                    max_new_tokens=100,                                                 # 최대 생성 길이
+                    input_embed_matrix=self.adaptors.language.embed_tokens.weight,      # 토큰 -> 임베딩 벡터 변환 표
+                    logit_matrix=self.adaptors.language.lm_head.weight,                 # LLM 최종 head의 가중치 행렬; [vocab_size, 896]
                     attention_mask=attention_mask,
                     # position_ids=position_ids,
                 )
                 
-                inputs_driving = self.adaptors.driving(driving_input)
-                input_embed_concat = torch.cat((input_embeds, inputs_driving["inputs"][b_idx].unsqueeze(0)), dim=1)
-                features, logits = self.language_model.forward(input_embed_concat)
+                inputs_driving = self.adaptors.driving(driving_input)   # path, speed wp query embedding 가져오기
+                input_embed_concat = torch.cat((input_embeds, inputs_driving["inputs"][b_idx].unsqueeze(0)), dim=1)     # input_embeds [1, 543+N, 896], inputs_driving["inputs"][b_idx].unsqueeze(0) [1, 30, 896] -> concat [1, 543+N+30, 896]
+                features, logits = self.language_model.forward(input_embed_concat)  # features: transformer 마지막 레이어의 출력, logits: lm_head를 통과한 값
 
                 len_driving = inputs_driving["inputs"].size(1)
 
-                driving_features = features[:, -len_driving:]
-                driving_logits = logits[:, -len_driving:]
-                predictions = self.adaptors.driving.get_predictions(driving_features, driving_logits)
+                driving_features = features[:, -len_driving:]   # 마지막 30칸만 자르기
+                driving_logits = logits[:, -len_driving:]       # 마지막 30칸만 자르기
+                predictions = self.adaptors.driving.get_predictions(driving_features, driving_logits)   # DrivingAdaptor의 get_predictions 호출하여 speed_wps, route 반환
                     
                 for k, v in predictions.items():
                     if v is not None:

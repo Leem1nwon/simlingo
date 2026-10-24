@@ -168,12 +168,12 @@ class DrivingAdaptor(nn.Module):
 
         current_index = 0
         predictions = {}
-        for i, input_type in enumerate(self.order):
+        for i, input_type in enumerate(self.order):     # self.order = ['route', 'speed_wps'] or ['speed_wps'] depending on config
             size = self.sizes[input_type]
 
-            feature = features[:, current_index: current_index + size]
-            prediction = self.heads[input_type](feature).cumsum(1)
-
+            feature = features[:, current_index: current_index + size]  # [B, N, hidden_size]; e.g. route: [B, 20, hidden_size], speed_wps: [B, 10, hidden_size]
+            prediction = self.heads[input_type](feature).cumsum(1)      # MLP head 통과 후 cumulative sum; e.g. route: [B, 20, 2], speed_wps: [B, 10, 1] or [B, 10, 2]
+                                                                        # MLP head가 내는 값은 delta 값이므로 cumulative sum을 통해 실제 waypoint 좌표를 얻음
             predictions[input_type] = prediction
             current_index += size
         
