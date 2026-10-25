@@ -173,7 +173,7 @@ class DrivingModel(pl.LightningModule):
                         else:
                             setattr(self, k, v)
                                 
-                self.language.append(self.tokenizer.batch_decode(sampled_tokens, skip_special_tokens=True)[0])
+                self.language.append(self.tokenizer.batch_decode(sampled_tokens, skip_special_tokens=True)[0])  # sampled_tokens에 담긴 token ID를 문자열로 decode 하는 부분
         else:
             # single forward pass same as during training so we can use the same function
             features = self.forward_model(driving_input, adaptor_dict)
@@ -289,7 +289,7 @@ class DrivingModel(pl.LightningModule):
 
         self.num_route_points = 20
         route_equal = []
-        for i in range(len(route)):
+        for i in range(len(route)):     # 샘플 수만큼
             route_equal.append(self.equal_spacing_route(route[i].cpu()))
         route_equal = torch.tensor(route_equal)
         route = route_equal.to(route.device)
@@ -332,11 +332,11 @@ class DrivingModel(pl.LightningModule):
         shift = np.roll(route, 1, axis=0) # Shift by 1
         shift[0] = shift[1] # Set wraparound value to 0
 
-        dists = np.linalg.norm(route-shift, axis=1)
-        dists = np.cumsum(dists)
-        dists += np.arange(0, len(dists))*1e-4 # Prevents dists not being strictly increasing
+        dists = np.linalg.norm(route-shift, axis=1) # 각 점 사이의 거리 계산
+        dists = np.cumsum(dists)                    # 누적 거리 계산
+        dists += np.arange(0, len(dists))*1e-4      # Prevents dists not being strictly increasing
 
-        x = np.arange(0, 20, 1)
+        x = np.arange(0, 20, 1)     # [0, 1, 2, ..., 19]
         interp_points = np.array([np.interp(x, dists, route[:, 0]), np.interp(x, dists, route[:, 1])]).T
 
         return interp_points
